@@ -1,0 +1,2 @@
+nant release.tag
+PAUSE

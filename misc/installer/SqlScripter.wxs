@@ -1,0 +1,202 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--<?include configClinet.wxi ?>-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2003/01/wi">
+
+  <!-- Opis produktu, ID- GUID produktu wygenerowany w VisualStudio, 
+       UpgradeCode- GUID dla potrzeb przyszlych aktualizacji, Language i Codepage okreslaja zestaw 
+       znakow do instalatora -->
+  <!-- Przy tworzeniu nowego instlatora trzeba koniecznie zmienic "product id" !!!, 
+       dobrze rowniez byloby za kazdym razem gdy powstanie nowa wersja "major" zmienic "upgradecode" -->
+  <Product Name="$(env.display-name) $(env.version)" Id="$(env.Product.Guid)" UpgradeCode="5BB9D8B9-F0BC-4b64-AA69-DAAE1EFE7804"
+  Language="1045" Codepage="1250" Version="$(env.version.short)" Manufacturer="Qualent Software Sp. z o.o.">
+
+    <!-- Opis paczki instalacyjnej, ID- GUID instalatora generowany automatycznie przez WiX'a (??????....), Language i Codepage okreslaja zestaw znakow do instalatora -->
+    <Package Id="????????-????-????-????-????????????" Keywords="Installer"
+      Description="Instalator $(env.display-name) $(env.version.short)"
+      Comments="$(env.display-name) is a registered trademark of Qualent Software Sp. z o.o." Manufacturer="Qualent Software Sp. z o.o."
+      InstallerVersion="100" Languages="1045" Compressed="yes" SummaryCodepage="1250" />
+
+    <!-- opis wlasciwosci aktualizacji-->
+    <Upgrade Id="5BB9D8B9-F0BC-4b64-AA69-DAAE1EFE7804">
+      <!-- <UpgradeVersion OnlyDetect="yes" Property="PATCHFOUND"
+		  Minimum="$(env.version)" IncludeMinimum="yes" Maximum="$(env.version)" IncludeMaximum="yes" />
+		<UpgradeVersion OnlyDetect="yes" Property="NEWERFOUND"
+		  Minimum="$(env.version)" IncludeMinimum="no" />-->
+      <UpgradeVersion OnlyDetect="yes" Property="NEWERFOUND"
+        Minimum="$(env.version)" IncludeMinimum="yes" />
+      <UpgradeVersion Minimum="0.1" Maximum="$(env.version)" IncludeMinimum="yes" IncludeMaximum="no" OnlyDetect="no" RemoveFeatures="ALL"/>
+    </Upgrade>
+
+    <!-- komunikaty dla uzytkownika w zaleznosci od tego jaka jest zaintalowana aktualnie wersja KO-->
+    <CustomAction Id="AlreadyUpdated" Error="Aplikacja $(env.display-name) została juz wczesniej zaktualizowana do wersji $(env.version.short)" />
+    <CustomAction Id="NoDowngrade" Error="Znaleziono zainstalowaną aktualną lub nowsza wersje aplikacji $(env.display-name)." />
+
+    <!-- przebieg instalacji (wykrycie wersji, nastepnie deinstalacja starej wersji i aktualizacja) -->
+    <InstallExecuteSequence>
+      <Custom Action="NoDowngrade" After="FindRelatedProducts">NEWERFOUND</Custom>
+      <!-- <Custom Action="AlreadyUpdated" After="FindRelatedProducts">PATCHFOUND</Custom> -->
+      <RemoveExistingProducts After="InstallValidate" />
+    </InstallExecuteSequence>
+
+    <!-- Okreslenie archiwow nalezacych do instalacji, mozna tu okreslic czy archowum .cab bedzie zaszyte w msi czy nie, mozna rowniez zrealizowac tu instalacje z kilku nosnikow danych-->
+    <Media Id="1" Cabinet="Data.cab" EmbedCab="yes" DiskPrompt="CD-ROM #1" />
+    <Property Id="DiskPrompt" Value="Pakiet instalacyjny aplikacji $(env.display-name)" />
+
+    <!-- lista opcjonalnych informacji o aplikacji, dane podane tutaj wyswietlane beda w opisie aplikacji na liscie zainstalowanych aplikacji w systemie-->
+    <Property Id="ARPNOMODIFY">1</Property>
+    <Property Id="ARPCOMMENTS">$(env.display-name)</Property>
+    <Property Id="ARPCONTACT">+48 22 833 92 63</Property>
+    <!-- <Property Id='ARPHELPLINK'>@gualent.pl</Property>
+	<Property Id='ARPURLINFOABOUT'>http://www</Property>
+	<Property Id='ARPURLUPDATEINFO'>http://www</Property>
+	<Property Id='ARPHELPTELEPHONE'>http://www</Property>
+	<Property Id="ARPSIZE">10141</Property>-->
+
+
+    <!-- okreslenie docelowego katalogu dla aplikacji; nazwa kluczowa "ProgramFilesFolder" - zwraca sciezke do katalogu Program Files, INSTALLDIR - pelna sciezka instalacyjna aplikacji, uruchamiajac pakiet instalacyjny MSI "*.msi INSTALLDIR="path" mozna zmienic miejsce instalacji-->
+    <!-- w znacznikach wystepuja najczesciej dwa atrubuty: Name - ktotki format nazwy pliki/katalogu spelnijacy warunek nazwt 8.3, LongName - dluga nazwa pliku nie ograniczona 8.3-->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder" Name="PFiles">
+        <Directory Id="INSTALLDIR" Name="MainDir" LongName="$(env.name)">
+
+          <!-- podzial plikow aplikacji na komponenty, wymagane w sytuacji gdy instalacja aplikacji przewiduje wybor elementow ktore maja byc zainstalowane,
+			      w tym przypadju podzial jest sztuczny, tylko ze wzgledu na zwiekszenie przejrzystosci;
+			      kazdy komponent musi byc opatrzony inikalnym numerem GUID-->
+          <Component Id="MainExe" Guid="3695CF80-D079-11DB-8314-0800200C9A66">
+            <!--<CreateFolder Directory="logs">
+						<Permission Domain="[domain]" User="KO_ADMINISTRATORBIZNESOWY" ChangePermission="yes" Read="yes"/>
+					</CreateFolder>-->
+            <!-- elementy nalezace do komponentu min. pliki, skroty-->
+            <!-- Plik: DiskId - Media id, vital - okresla czy plik jest znaczacy dla aplikacji, jezeli instalacja elementu oznaczonego atrybutem Vital="yes" nie powiedzie sie to caly prosec instalacji bedzie przerwany -->
+            <File Id="ClientEXE" Name="Client.exe" LongName="$(env.client.name).exe" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.client.name).exe" Vital="yes">
+              <!-- Skroty zwiazane z danym komponentem, okresla sie tu ich lokalizacje; uzywane sa tutaj zdeklarowane pozniej nazwy sciezek-->
+              <Shortcut Id="startmenuKalkulatorOfert" Directory="ProgramMenuDir" Name="Client"
+                LongName="$(env.display-name) $(env.version)" WorkingDirectory="INSTALLDIR"
+                Icon="Client.exe" IconIndex="0" />
+              <Shortcut Id="desktopKalkulatorOfert" Directory="DesktopFolder" Name="Client"
+                LongName="$(env.display-name) $(env.version)" WorkingDirectory="INSTALLDIR"
+                Icon="Client.exe" IconIndex="0" />
+            </File>
+
+            <File Id="ClientPDB" Name="Client.pdb" LongName="$(env.client.name).pdb" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.client.name).pdb" Vital="yes">
+            </File>
+            <File Id="ClientXML" Name="Client.xml" LongName="$(env.client.name).xml" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.client.name).xml" Vital="yes">
+            </File>
+
+            <!-- Utworzenie wpisow w rejestrze systemowym-->
+            <Registry Id="entry1" Root="HKCR" Key="$(env.client.name)" Action="write" />
+            <Registry Id="entry2" Root="HKCR" Key="$(env.client.name)" Action="write" Type="string" Value="URL:$(env.display-name) Protocol" />
+            <Registry Id="entry3" Root="HKCR" Key="$(env.client.name)" Action="write" Type="string" Name="URL Protocol" Value="X" />
+            <Registry Id="entry4" Root="HKCR" Key="$(env.client.name)\DefaultIcon" Action="write" Type="string" Value='"[INSTALLDIR]$(env.client.name).exe"' />
+            <Registry Id="entry5" Root="HKCR" Key="$(env.client.name)\shell\open\command" Action="write" Type="string" Value='"[INSTALLDIR]$(env.client.name).exe" "%1"' />
+          </Component>
+
+          <Component Id="AppConfig" Guid="3695CF80-D079-11DB-8314-0800200C9A65">
+            <File Id="ClientCONFIG" Name="Client.cfg" LongName="$(env.client.name).exe.config" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.client.name).exe.config" Vital="yes">
+            </File>
+
+          </Component>
+
+          <Component Id="Core" Guid="51D4BFB2-D089-11DB-8314-0800200C9A66">
+            <File Id="CoreDLL" Name="Core.dll" LongName="$(env.core.name).dll" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.core.name).dll" Vital="yes">
+            </File>
+            <File Id="CorePDB" Name="Core.pdb" LongName="$(env.core.name).pdb" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.core.name).pdb" Vital="yes">
+            </File>
+          </Component>
+          
+          <Component Id="Console" Guid="3FBF1828-271C-41c7-B3B7-514E15FD3E9D">
+            <File Id="ConsoleEXE" Name="Console.exe" LongName="$(env.console.name).exe" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.console.name).exe" Vital="yes">
+            </File>
+            <File Id="ConsolePDB" Name="Console.pdb" LongName="$(env.console.name).pdb" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.console.name).pdb" Vital="yes">
+            </File>
+            <File Id="ConsoleCONFIG" Name="Console.cfg" LongName="$(env.console.name).exe.config" DiskId="1"
+                 Source="$(env.client.dir.dist)\$(env.console.name).exe.config" Vital="yes">
+            </File>
+          </Component>
+
+          <Component Id="nUnit" Guid="51D4BFC3-D089-11DB-8314-0800200C9A66">
+            <File Id="nunitframework" Name="nunit.dll" LongName="nunit.framework.dll" DiskId="1"
+                 Source="$(env.client.dir.dist)\nunit.framework.dll" Vital="yes">
+            </File>
+          </Component>
+
+          <Component Id="Qualent" Guid="51D4BFC3-D089-11DB-8314-0800200C9A66">
+            <File Id="QualentDataDLL" Name="QData.dll" LongName="Qualent.Data.dll" DiskId="1"
+                 Source="$(env.client.dir.dist)\Qualent.Data.dll" Vital="yes">
+            </File>
+            <File Id="QualentDataPDB" Name="QData.pdb" LongName="Qualent.Data.pdb" DiskId="1"
+                 Source="$(env.client.dir.dist)\Qualent.Data.pdb" Vital="yes">
+            </File>
+            <File Id="QualentWindowsDLL" Name="QWindows.dll" LongName="Qualent.Windows.dll" DiskId="1"
+                 Source="$(env.client.dir.dist)\Qualent.Windows.dll" Vital="yes">
+            </File>
+            <File Id="QualentWindowsPDB" Name="QWindows.pdb" LongName="Qualent.Windows.pdb" DiskId="1"
+                 Source="$(env.client.dir.dist)\Qualent.Windows.pdb" Vital="yes">
+            </File>
+            <File Id="QualentDocumentDLL" Name="QDocnt.dll" LongName="Qualent.Document.dll" DiskId="1"
+                 Source="$(env.client.dir.dist)\Qualent.Document.dll" Vital="yes">
+            </File>
+            <File Id="QualentDocumentPDB" Name="QDocnt.pdb" LongName="Qualent.Document.pdb" DiskId="1"
+                 Source="$(env.client.dir.dist)\Qualent.Document.pdb" Vital="yes">
+            </File>
+          </Component>
+
+          <Component Id="Log4Net" Guid="51D4BFB4-D089-11DB-8314-0800200C9A66">
+            <File Id="Log4NetDLL" Name="log4net.dll" LongName="log4net.dll" DiskId="1"
+                 Source="$(env.client.dir.dist)\log4net.dll" Vital="yes">
+            </File>
+          </Component>
+
+
+
+
+          <!-- kopiowanie pliku do Application Data, tutaj niewykorzystane
+	</Directory>
+		<Directory Id="AppDataFolder" Name="AppData">
+			<Directory Id="DBINSTALLDIR" Name="Qualent" LongName="Qualent Software">
+				<Component Id="SQLDataBase" Guid="51D4BFB7-D089-11DB-8314-0800200C9A66">
+					<File Id="KalkulatorOfertSDF" Name="KalkOfer.sdf" LongName="Polkomtel-KalkulatorOfert.sdf" DiskId="1"
+						 Source="$(env.client.dir.dist)\Polkomtel-KalkulatorOfert.sdf" Vital="yes">
+					</File>
+				</Component>
+			</Directory>-->
+        </Directory>
+      </Directory>
+
+      <!-- deklaracja nazw sciezek uzywanych wyzej przy tworzeniu akrotow, ProgramMenuDir - sciezka skrotow do programow w MenuStart systemu, DesktopFolder - sciezka do Pulpitu uzytkownika-->
+      <Directory Id="ProgramMenuFolder" Name="PMenu" LongName="Programs">
+        <Directory Id="ProgramMenuDir" Name="KalkOfer" LongName="$(env.display-name) $(env.version)" />
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+
+    <!-- opis wlasciwosci instalacji, przydatne przy aplikacji w ktorej mozna wybierac wlasnosci do instalacji lub posiada rozne typu instalacji np. Typical, Complete, Minimal
+   Level - okresla do ktorego "poziomu" instalacji nalezy dana wlasciwosc; przy delkaraci wlasciwosci instalacji podaje sie odwolanie do wczesniej wyodebnionych komponentow-->
+    <Feature Id="Complete" Title="$(env.display-name) $(env.version.short)" Description="Pelna instalacja"
+      Display="expand" Level="1" ConfigurableDirectory="INSTALLDIR" TypicalDefault="install">
+      <Feature Id="Main" Level="1" Title="Program" Description="Pliki programu">
+        <ComponentRef Id="Core" />
+        <ComponentRef Id="Console" />
+        <ComponentRef Id="MainExe" />
+        <ComponentRef Id="AppConfig" />
+        <ComponentRef Id="Log4Net" />
+        <ComponentRef Id="nUnit" />
+        <ComponentRef Id="Qualent" />
+      </Feature>
+      <Feature Id="Docs" Title="Instrukcja" Description="Podrecznik uzytkownika" Level="1">
+      </Feature>
+    </Feature>
+
+    <!-- deklaracja ikony ktora jest wykozystywana przy skrotach do aplikacji -->
+    <Icon Id="Client.exe" SourceFile="..\..\$(env.client.name)\App.ico" />
+
+  </Product>
+</Wix>

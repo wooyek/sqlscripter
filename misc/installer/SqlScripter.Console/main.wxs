@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?include config.wxi ?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2003/01/wi">
+
+  <!-- Opis produktu, ID- GUID produktu wygenerowany w VisualStudio, UpgradeCode- GUID dla potrzeb przyszlych aktualizacji, Language i Codepage okreslaja zestaw znakow do instalatora -->
+  <!-- Przy tworzeniu nowego instlatora trzeba koniecznie zmienic "product id" !!!, dobrze rowniez byloby za kazdym razem gdy powstanie nowa wersja "major" zmienic "upgradecode" -->
+  <Product Name="$(var.ProductName) $(var.version)" Id="$(var.product.guid)" UpgradeCode="$(var.UpgradeCode)"
+		Language="1045" Codepage="1250" Version="$(var.version.long)" Manufacturer="$(var.CompanyName)">
+
+    <!-- Opis paczki instalacyjnej, ID- GUID instalatora generowany automatycznie przez WiX'a (??????....), Language i Codepage okreslaja zestaw znakow do instalatora -->
+    <Package Id="????????-????-????-????-????????????" Keywords="Installer"
+		  Description="Instalator $(var.ProductName) $(var.version.short)"
+		  Comments="$(var.ProductName) is a trademark or registered trademark of $(var.CompanyName)"
+      Manufacturer="$(var.CompanyName)" InstallerVersion="100" Languages="1045" Compressed="yes"
+      SummaryCodepage="1250" />
+
+    <!-- opis wlasciwosci aktualizacji-->
+    <Upgrade Id="$(var.UpgradeCode)">
+      <UpgradeVersion Minimum="0.0.0.0" Maximum="$(var.version)" OnlyDetect="yes" IncludeMinimum="yes" IncludeMaximum="no" Property="OLDERVERSIONFOUND" />
+      <UpgradeVersion OnlyDetect="yes" Property="PATCHFOUND" IncludeMinimum="no" Minimum="$(var.version)" />
+      <UpgradeVersion OnlyDetect="yes" Property="CURRENTFOUND" IncludeMinimum="yes" IncludeMaximum="yes" Minimum="$(var.version)" Maximum="$(var.version)" />
+    </Upgrade>
+
+    <UIRef Id="WixUI_Mondo" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+
+    <!-- komunikaty dla uzytkownika w zaleznosci od tego jaka jest zaintalowana aktualnie wersja KO-->
+    <CustomAction Id="AlreadyUpdated" Error="Newer version of $(var.ProductName) was found on this machine." />
+
+    <!-- Akcje które faktycznie określają co ten instalator robi -->
+    <CustomAction Id="FindCurrentVersion" Error="$(var.ProductName) $(var.version) is installed on this machine." />
+
+    <!-- Binarki które są specyficzne dla tego instalatora -->
+    <Binary Id="wixca" src="wixca.dll"/>
+    <Binary Id='PermissionHelper.vbs' src='PermissionHelper.vbs'/>
+    <Binary Id='IISHelper.vbs' src='IISHelper.vbs'/>
+    <Binary Id='Util.vbs' src='Util.vbs'/>
+
+    <!-- przebieg instalacji -->
+    <InstallExecuteSequence>
+      <Custom Action="FindCurrentVersion" After="FindRelatedProducts">CURRENTFOUND</Custom>
+      <Custom Action="AlreadyUpdated" After="FindCurrentVersion">PATCHFOUND</Custom>
+      <RemoveExistingProducts After="InstallValidate" />
+    </InstallExecuteSequence>
+
+    <!-- Okreslenie archiwow nalezacych do instalacji, mozna tu okreslic czy archowum .cab bedzie zaszyte w msi czy nie, mozna rowniez zrealizowac tu instalacje z kilku nosnikow danych-->
+    <Media Id="1" Cabinet="Data.cab" EmbedCab="yes" DiskPrompt="CD-ROM #1" />
+    <Property Id="DiskPrompt" Value="Pakiet instalacyjny: $(var.ProductName)" />
+
+    <!-- lista opcjonalnych informacji o aplikacji, dane podane tutaj wyswietlane beda w opisie aplikacji na liscie zainstalowanych aplikacji w systemie-->
+    <Property Id="ARPNOMODIFY">1</Property>
+    <Property Id="ARPCOMMENTS">$(var.ProductName)</Property>
+    <Property Id="ARPCONTACT">+48 22 833 92 63</Property>
+
+
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder" Name="PFiles">
+      <!--Directory Id="INSTALLDIR" Name="$(var.app.name.short)" LongName="$(var.app.name)"-->
+      <Directory Id="INSTALLDIR" Name="SQLScr-1" LongName="$(var.ProductName)">
+          <!-- podzial plikow aplikacji na komponenty, wymagane w sytuacji gdy instalacja aplikacji przewiduje wybor elementow ktore maja byc zainstalowane,
+						w tym przypadju podzial jest sztuczny, tylko ze wzgledu na zwiekszenie przejrzystosci;
+						kazdy komponent musi byc opatrzony inikalnym numerem GUID-->
+          <Directory Id="AppLogs" Name="logs">
+            <Component Id="logs" Guid="{165A8215-1748-4dfe-A22B-846D6E065FF8}" KeyPath="yes" NeverOverwrite="yes" Permanent="yes">
+              <CreateFolder Directory="AppLogs">
+                <!--Permission User="[USERGROUP_USERS]" Domain="[MachineName]" Read="yes" GenericRead="yes" ReadAttributes="no" Extended="yes" GenericAll="no"/-->
+              </CreateFolder>
+            </Component>
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <Feature Id="Complete" Title="$(var.app.name)-$(var.version)" Description="Full install" 
+  	Display="expand" Level="1" ConfigurableDirectory="INSTALLDIR" TypicalDefault="install">
+      <ComponentRef Id="component" />
+      <ComponentRef Id="logs" />
+    </Feature>
+  </Product>
+</Wix>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ==================================================================
+* Copyright 2003-2006 Janusz Skonieczny
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*  http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+* Created by: WooYek on 13:20:43 2003-01-30
+*
+* Last changes made by:
+* $Id: assembly.nant.build 19 2009-01-16 10:53:14Z janusz.skonieczny $
+*
+ =================================================================== -->
+
+<!-- =========================================================== -->
+<!-- read comments carefully and then ask questions -->
+<!-- =========================================================== -->
+
+<project name="SqlScripter.Core" default="build" basedir="." xmlns='http://nant.sourceforge.net/schema/nant-0.84.xsd'>
+  <property name="dir.solution" value="${project::get-base-directory()}/.." />
+  <include buildfile="${dir.solution}/misc/nant/common-project.nant.build" />
+
+  <!-- =========================================================== -->
+  <!-- Initialize project properties -->
+  <!-- =========================================================== -->
+  <target name="init" depends="common.init">
+    <!-- Project specific configurations -->
+    <property name="assemblyinfo.cs" value="${dir.build}/AssemblyInfo.cs"/>
+    <property name="define" value=""/>
+    <!--<property name="define" value="PocketPC;Log4netCF" unless="${property::exists('w32')}"/>-->
+    <!--<property name="define" value="PocketPC;Log4netCF;W32" if="${property::exists('w32')}"/>-->
+
+    <!-- Print properties set, for debugging -->
+    <properties/>
+
+    <!-- Define refrence libraries -->
+    <fileset basedir="${dir.lib}" id="project.references">
+      <include name="**/*.dll"/>
+    </fileset>
+
+  </target>
+
+  <target name="clean" depends="init,common.clean"/>   
+  <target name="build" depends="init,common.build-library"/>
+  <target name="dist" depends="init,clean,build,dist.quick"/>
+  <target name="dist.quick" depends="init,common.dist-quick">
+  </target>
+
+</project>

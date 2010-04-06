@@ -1,0 +1,179 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- ==================================================================
+* Copyright 2003-2010 Janusz Skonieczny
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*  http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+ =================================================================== -->
+
+<!-- =========================================================== -->
+<!-- read comments carefully and then ask questions   -->
+<!-- =========================================================== -->
+
+<project name="SqlScripter" default="usage" basedir="." xmlns='http://nant.sourceforge.net/schema/nant-0.84.xsd'>
+
+  <property name="project.prefix" value="SqlScripter"/>
+  <property name="basedir" value="${project::get-base-directory()}"/>
+  <property name="dir.solution" value="${basedir}"/>
+  
+  <property name="dir.archive" value="..\"/>
+  <property name="svn.basepath" value="https://sqlscripter.googlecode.com/svn"/>
+  <property name="coverage" value="false"/>
+
+  <include buildfile="${dir.solution}/settings.nant.user" failonerror="false"/>
+  <include buildfile="${dir.solution}/../settings.nant.user" failonerror="false"/>
+
+  <property name="makensis.exe" value="c:\program files\NSIS\makensis.exe" unless="${property::exists('makensis.exe')}"/>
+  <property name="wix.dir" value="D:\usr\tools\wix-2.0.5805.0" unless="${property::exists('wix.dir')}"/>
+  <property name="mallow.dir" value="D:\usr\tools\Mallow" unless="${property::exists('mallow.dir')}"/>
+  <property name="cvs.exe" value="c:\Program Files\TortoiseCVS\cvs.exe" unless="${property::exists('cvs.exe')}"/>
+  <property name="svn.exe" value="C:\Program Files\Subversion\svn.exe" unless="${property::exists('svn.exe')}"/>
+  <property name="hg.exe" value="C:\Program Files\TortoiseHg\hg.exe" unless="${property::exists('hg.exe')}"/>
+  <property name="fxcop.dir" value="C:\Program Files\Microsoft FxCop 1.32" unless="${property::exists('fxcop.dir')}"/>
+  <property name="ncover.org.exe" value="D:\usr\tools\NCover-2.1.0\NCover.Console.exe" unless="${property::exists('ncover.org.exe')}"/>
+  <property name="NCoverExplorer.Console.exe" value="D:\usr\tools\NCover-2.1.0\NCoverExplorer.Console.exe" unless="${property::exists('NCoverExplorer.Console.exe')}"/>
+  <property name="NCoverExplorer.NAntTasks.dll" value="D:\usr\tools\NCover-2.1.0\Build Task Plugins\NCoverExplorer.NAntTasks.dll" unless="${property::exists('NCoverExplorer.NAntTasks.dll')}"/>
+  <property name="nant.exe" value="D:\usr\tools\nant-0.85\bin\NAnt.exe" unless="${property::exists('nant.exe')}"/>
+  <property name="hhc.exe" value="D:\usr\tools\hhc\hhc.exe" unless="${property::exists('hhc.exe')}"/>
+  <property name="aspnet_compiler2" value="${framework::get-framework-directory(framework::get-target-framework())}\aspnet_compiler"/>
+  <property name="aspnet_compiler" value="C:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\aspnet_compiler"/>
+
+  <include buildfile="${dir.solution}/misc/nant/common-solution.nant.build"/>
+  <!-- Define subprojects here -->
+  <fileset id="projects">
+    <include name="${project.prefix}.Core/assembly.nant.build"/>
+    <include name="${project.prefix}.Console/console.nant.build"/>
+    <include name="${project.prefix}.Client/winexe.nant.build"/>
+    <include name="${project.prefix}.Service/console.nant.build"/>
+    <include name="${project.prefix}.Client-Help/winhelp.nant.build"/>
+    <include name="${project.prefix}.TestApp/winexe.nant.build"/>
+    <include name="${project.prefix}.Tests/assembly.nant.build"/>
+    <include name="${project.prefix}.Web/web.nant.build"/>
+  </fileset>
+
+  <!-- Put here semicolon separated list of coverage target assemlies -->
+  <property name="coverage.target" value="${project.prefix}.Core;${project.prefix}.Tests"/>
+
+  <fileset id="test.target">
+    <include name="${basedir}/${project.prefix}.Core/build/dist/${project.prefix}.Core/${project.prefix}.Core.dll"/>
+    <include name="${basedir}/${project.prefix}.Tests/build/dist/${project.prefix}.Tests/${project.prefix}.Tests.dll"/>
+  </fileset>
+  
+  <!-- =========================================================== -->
+  <!-- Initialize target -->
+  <!-- =========================================================== -->
+  <target name="init" depends="common.solution-init">
+    <properties/>
+  </target>
+  <target name="usage" depends="init, common.solution-usage"/>
+  <target name="clean" depends="common.solution-clean"/>
+
+  <!-- =========================================================== -->
+  <!-- Compilation of subprojects  -->
+  <!-- =========================================================== -->
+  <target name="build" depends="init">
+    <mkdir dir="${dir.build}"/>
+    <nant target="build">
+      <buildfiles refid="projects"/>
+    </nant>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Creates distribution of system -->
+  <!--    -->
+  <!-- manually specify filenames needed to copy to distribution -->
+  <!-- =========================================================== -->
+  <target name="dist" depends="clean,build">
+    <nant target="dist.quick">
+      <buildfiles refid="projects"/>
+    </nant>
+
+    <!-- Dist web appliaction -->
+    <mkdir dir="${dir.dist}/"/>
+    <copy todir="${dir.dist}/">
+      <fileset basedir="${basedir}/build/web.build-${project.prefix}.Web/dist/">
+        <include name="**/*"/>
+        <exclude name="**/CVS"/>
+        <exclude name="logs/**"/>
+        <exclude name="**/.svn"/>
+        <exclude name="nunit.framework.dll"/>
+        <exclude name="nmock.dll"/>
+        <exclude name="NUnitAsp.dll"/>
+      </fileset>
+    </copy>
+    <property name="web.config" value="${basedir}/build/web.build/dist/Web.Config"/>
+
+    <!-- Prepare instalation ready web.config -->
+    <copy file="${web.config}" tofile="${dir.dist}/${project.prefix}.Web/Web.Config" overwrite="true" if="${file::exists(web.config)}">
+      <filterchain>
+        <replacestring from="Data Source=localhost;Initial Catalog=${solution.name};" to="Data Source=DEPLOY_SERVER;Initial Catalog=${solution.name};" />
+      </filterchain>
+    </copy>	
+
+    <!-- Dist srevice application -->
+    <copy todir="${dir.dist}/">
+      <fileset basedir="${basedir}/${project.prefix}.Client/build/dist/">
+        <include name="**/*"/>
+        <exclude name="**/CVS"/>
+        <exclude name="**/.svn"/>
+        <exclude name="nunit.framework.dll" if="false"/>
+        <exclude name="nmock.dll"  if="true"/>
+        <exclude name="NUnitAsp.dll" if="true"/>
+      </fileset>
+    </copy>
+
+    <!-- Dist console application -->
+    <copy todir="${dir.dist}/">
+      <fileset basedir="${basedir}/${project.prefix}.Console/build/dist/">
+        <include name="**/*"/>
+      </fileset>
+    </copy>
+  </target>
+  
+  <!-- =========================================================== -->
+  <!-- Deploys distribution to the server  -->
+  <!-- =========================================================== -->
+  <target name="deploy" depends="dist,deploy.quick"/>
+  <target name="deploy.quick"></target>
+
+  <!-- =========================================================== -->
+  <!-- Make Installer targets  -->
+  <!-- =========================================================== -->
+  <target name="installer" depends="init" if="true">
+    <nant target="installer">
+      <!--buildfiles refid="projects"/-->
+      <buildfiles>
+        <include name="${project.prefix}.Web/web.nant.build"/>
+        <include name="${project.prefix}.Client/winexe.nant.build"/>
+        <include name="${project.prefix}.Console/console.nant.build"/>
+      </buildfiles>
+    </nant>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Database cleanup and initialization -->
+  <!-- =========================================================== -->
+  <target name="initdb" depends="init">
+
+    <call target="common.init-db"/>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Solution testing -->
+  <!-- =========================================================== -->
+  <target name="nunit.quick" depends="init">
+    <copy file="${basedir}/${project.prefix}.Core/App.config" tofile="${basedir}/${project.prefix}.Core/build/dist/${project.prefix}.Core/${project.prefix}.Core.dll.config" failonerror="false"/>
+    <copy file="${basedir}/${project.prefix}.Tests/App.config" tofile="${basedir}/${project.prefix}.Tests/build/dist/${project.prefix}.Test/${project.prefix}.Tests.dll.config" failonerror="false"/>
+    <call target="common-nunit.quick"/>
+  </target>
+</project>

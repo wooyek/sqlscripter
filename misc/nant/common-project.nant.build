@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="utf-8"?><!-- 
+* ==================================================================
+* Copyright 2010 Janusz Skonieczny
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*  http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+* =================================================================== -->
+<project name="common.tasks" default="usage" basedir="." xmlns='http://nant.sourceforge.net/schema/nant-0.84.xsd'>
+  <loadtasks assembly="${dir.solution}/misc/nant/WooYek.NAnt.dll"/>
+
+  <!-- =========================================================== -->
+  <!-- Common project properties initiliztion -->
+  <!-- =========================================================== -->
+
+  <target name="common.init">
+    <property name="basedir" value="${project::get-base-directory()}"/>
+
+    <!-- =========================================================== -->
+    <!-- These are vendor specific options -->
+    <!-- =========================================================== -->
+
+    <property name="app.name.suffix" value="NotSuffixed"/>
+    <property name="app.name" value="${project::get-name()}"/>
+    <property name="solution.name" value="ClientName-ProjectName" unless="${property::exists('solution.name')}"/>
+    <property name="client.name" value="ClientName" unless="${property::exists('client.name')}"/>
+    <property name="app.Name" value="${string::replace(solution.name, '-', '/')} - ${app.name}"/>
+    <property name="app.vendor" value="App Vendor" unless="${property::exists('app.vendor')}"/>
+    <property name="app.description" value=".NET Assembly for ${solution.name} project."/>
+    <!-- this paramter is set in solution build script, if build alone it should stay 0.0 here to indicate that -->
+    <property name="year" value="2008"/>
+    <property name="copyright" value="Copyright" unless="${property::exists('copyright')}"/>
+
+
+    <!-- =========================================================== -->
+    <!-- Seting project directories -->
+    <!-- =========================================================== -->
+
+    <property name="dir.build" value="${basedir}/build"/>
+    <property name="dir.dist" value="${dir.build}/dist"/>
+    <property name="dir.dist.src" value="${basedir}/data/dist"/>
+    <property name="dir.misc" value="${basedir}/misc"/>
+    <property name="dir.etc" value="${basedir}/etc"/>
+    <property name="dir.doc" value="${basedir}/doc"/>
+    <property name="dir.lib" value="${basedir}/../lib"/>
+    <property name="dir.src" value="${basedir}/src"/>
+    <property name="assemblyinfo.cs" value="${dir.build}/AssemblyInfo.cs"/>
+
+    <echo message="====================================================================="/>
+    <echo message="|  ${app.Name} version ${buildnumber.version} [${year}]"/>
+    <echo message="====================================================================="/>
+
+    <!-- Compiler settings -->
+    <property name="debug" value="true" unless="${property::exists('debug')}"/>
+    <property name="optimize" value="false" unless="${property::exists('optimize')}"/>
+    <property name="warninglevel" value="3" unless="${property::exists('warninglevel')}"/>
+
+    <tstamp>
+      <formatter property="time.now.long" pattern="d MMMM yyyy HH:mm:ss"/>
+    </tstamp>
+
+    <property name="username" value="${environment::get-user-name()}" />
+    <property name="hostname" value="${environment::get-variable('COMPUTERNAME')}"/>
+
+    <property name="version" value="${buildnumber.major}.${buildnumber.minor}.${buildnumber.build}" />
+    <property name="version.short" value="${buildnumber.major}.${buildnumber.minor}" />
+
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Common project AssemblyInfo.cs generation -->
+  <!-- =========================================================== -->
+
+  <target name="common.generate-assemblyinfo">
+    <property name="module.name" value=""/>
+    <asminfo output="${assemblyinfo.cs}" language="CSharp">
+      <imports>
+        <import namespace="System"/>
+        <import namespace="System.Reflection"/>
+      </imports>
+      <attributes>
+        <attribute type="AssemblyTitleAttribute" value="${app.name}"/>
+        <attribute type="AssemblyDescriptionAttribute" value="${app.description} Build by: ${username} on ${time.now.long}. Target framework ${framework::get-description(framework::get-target-framework())}. Build machine ${hostname}: ${operating-system::to-string(environment::get-operating-system())} ${framework::get-description(framework::get-runtime-framework())}"/>
+        <attribute type="AssemblyConfigurationAttribute" value=""/>
+        <attribute type="AssemblyCompanyAttribute" value="${app.vendor}"/>
+        <attribute type="AssemblyProductAttribute" value="${app.name}"/>
+        <attribute type="AssemblyCopyrightAttribute" value="${copyright}"/>
+        <attribute type="AssemblyVersionAttribute" value="${buildnumber.version}"/>
+        <attribute type="AssemblyKeyFileAttribute" value="${basedir}/StrongName.snk" if="${file::exists(property::get-value('basedir')+'\\StrongName.snk')}"/>
+      </attributes>
+    </asminfo>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Common library project build -->
+  <!-- =========================================================== -->
+
+  <target name="common.build-library">
+    <mkdir dir="${dir.build}"/>
+    <call target="common.generate-assemblyinfo"/>
+    <call target="common.compile-library"/>
+    <delete file="${dir.build}/AssemblyInfo.cs"/>
+    <copy tofile="${dir.build}/${app.name}.dll.config" file="${basedir}/App.config" if="${file::exists(basedir+'/App.config')}"/>
+    <copyref file="${dir.build}/${app.name}.dll" todir="${dir.build}" verbose="true">
+      <assemblies refid="project.references"/>
+    </copyref>
+  </target>
+
+  <target name="common.compile-library">
+    <csc target="library"
+      output="${dir.build}/${app.name}.dll"
+      debug="${debug}"
+      optimize="${optimize}"
+      doc="${dir.build}/${app.name}.xml"
+      warninglevel="${warninglevel}"
+      define="${define}"
+      verbose="false">
+      <sources>
+        <include name="${dir.src}/**/*.cs"/>
+        <include name="${assemblyinfo.cs}"/>
+        <exclude name="${dir.src}/AssemblyInfo.cs"/>
+        <include name="${basedir}/Properties/*.cs"/>
+        <include name="${basedir}/Resources/*.cs"/>
+        <exclude name="${basedir}/Properties/AssemblyInfo.cs"/>
+        <include name="${basedir}/Web References/**/*.cs"/>
+        <include name="${basedir}/Service References/**/*.cs"/>
+      </sources>
+      <!-- Only used references will be set inside this assembly -->
+      <references refid="project.references"/>
+      <resources dynamicprefix="true" prefix="${app.name}" basedir="${basedir}">
+        <include name="${basedir}/Properties/*.resx"/>
+        <include name="${basedir}/Properties/**/*.xml"/>
+        <include name="${basedir}/Properties/**/*.xsl"/>
+        <include name="${basedir}/Resources/*.resx"/>
+        <include name="${basedir}/Resources/**/*.xml"/>
+        <include name="${basedir}/Resources/**/*.xsl"/>
+        <include name="${dir.src}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.gif"/>
+        <include name="${dir.etc}/**/*.bmp"/>
+        <include name="${dir.etc}/**/*.png"/>
+        <include name="${dir.etc}/**/*.xsd"/>
+        <include name="${dir.etc}/**/*.xslt"/>
+        <include name="${dir.etc}/**/*.xml"/>
+      </resources>
+    </csc>
+  </target>
+  
+  <!-- =========================================================== -->
+  <!-- Common silverlight project build -->
+  <!-- =========================================================== -->
+
+  <target name="common.build-silverlight">
+    <mkdir dir="${dir.build}"/>
+    <call target="common.generate-assemblyinfo"/>
+    <call target="common.compile-silverlight"/>
+    <delete file="${dir.build}/AssemblyInfo.cs"/>
+    <copy tofile="${dir.build}/${app.name}.dll.config" file="${basedir}/App.config" if="${file::exists(basedir+'/App.config')}"/>
+    <copyref file="${dir.build}/${app.name}.dll" todir="${dir.build}" verbose="true">
+      <assemblies refid="project.references"/>
+    </copyref>
+  </target>
+
+  <target name="common.compile-silverlight">
+    <csc target="library"
+      output="${dir.build}/${app.name}.dll"
+      debug="${debug}"
+      optimize="${optimize}"
+      doc="${dir.build}/${app.name}.xml"
+      warninglevel="${warninglevel}"
+      define="${define}"
+      verbose="false">
+      <sources>
+        <include name="${dir.src}/**/*.cs"/>
+        <include name="${assemblyinfo.cs}"/>
+        <exclude name="${dir.src}/AssemblyInfo.cs"/>
+        <include name="${basedir}/Properties/*.cs"/>
+        <include name="${basedir}/Resources/*.cs"/>
+        <exclude name="${basedir}/Properties/AssemblyInfo.cs"/>
+        <include name="${basedir}/Web References/**/*.cs"/>
+        <include name="${basedir}/Service References/**/*.cs"/>
+      </sources>
+      <!-- Only used references will be set inside this assembly -->
+      <references refid="project.references"/>
+      <resources dynamicprefix="true" prefix="${app.name}" basedir="${basedir}">
+        <include name="${basedir}/Properties/Resources.resx"/>
+        <include name="${basedir}/Properties/**/*.xml"/>
+        <include name="${basedir}/Properties/**/*.xsl"/>
+        <include name="${basedir}/Resources/*.resx"/>
+        <include name="${basedir}/Resources/**/*.xml"/>
+        <include name="${basedir}/Resources/**/*.xsl"/>
+        <include name="${dir.src}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.gif"/>
+        <include name="${dir.etc}/**/*.bmp"/>
+        <include name="${dir.etc}/**/*.png"/>
+        <include name="${dir.etc}/**/*.xsd"/>
+        <include name="${dir.etc}/**/*.xslt"/>
+        <include name="${dir.etc}/**/*.xml"/>
+      </resources>
+    </csc>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Common exe project build -->
+  <!-- =========================================================== -->
+
+  <target name="common.build-exe">
+    <mkdir dir="${dir.build}"/>
+    <call target="common.generate-assemblyinfo"/>
+    <call target="common.compile-exe"/>
+    <delete file="${dir.build}/AssemblyInfo.cs"/>
+    <copy tofile="${dir.build}/${app.name}.exe.config" file="${basedir}/App.config" if="${file::exists(basedir+'/App.config')}"/>
+    <copyref file="${dir.build}/${app.name}.exe" todir="${dir.build}" verbose="true">
+      <assemblies refid="project.references"/>
+    </copyref>
+  </target>
+
+  <target name="common.compile-exe">
+    <csc target="exe"
+      output="${dir.build}/${app.name}.exe"
+      debug="${debug}"
+      optimize="${optimize}"
+      doc="${dir.build}/${app.name}.xml"
+      warninglevel="${warninglevel}"
+      define="${define}"
+      verbose="false"
+      win32icon="${basedir}\App.ico">
+      <sources>
+        <include name="${dir.src}/**/*.cs"/>
+        <include name="${assemblyinfo.cs}"/>
+        <exclude name="${dir.src}/AssemblyInfo.cs"/>
+        <include name="${basedir}/Properties/*.cs"/>
+        <exclude name="${basedir}/Properties/AssemblyInfo.cs"/>
+        <include name="${basedir}/Web References/**/*.cs"/>
+      </sources>
+      <!-- Only used references will be set inside this assembly -->
+      <references refid="project.references"/>
+      <resources dynamicprefix="true" prefix="${app.name}" basedir="${basedir}">
+        <include name="${basedir}/Properties/Resources.resx"/>
+        <include name="${basedir}/Properties/**/*.xml"/>
+        <include name="${basedir}/Properties/**/*.xsl"/>
+        <include name="${basedir}/Resources/Resources.resx"/>
+        <include name="${basedir}/Resources/**/*.xml"/>
+        <include name="${basedir}/Resources/**/*.xsl"/>
+        <include name="${dir.src}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.gif"/>
+        <include name="${dir.etc}/**/*.bmp"/>
+        <include name="${dir.etc}/**/*.png"/>
+        <include name="${dir.etc}/**/*.xsd"/>
+        <include name="${dir.etc}/**/*.xslt"/>
+        <include name="${dir.etc}/**/*.xml"/>
+      </resources>
+    </csc>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Common winexe project build -->
+  <!-- =========================================================== -->
+
+  <target name="common.build-winexe">
+    <mkdir dir="${dir.build}"/>
+    <call target="common.generate-assemblyinfo"/>
+    <call target="common.compile-winexe"/>
+    <delete file="${dir.build}/AssemblyInfo.cs"/>
+    <copy tofile="${dir.build}/${app.name}.exe.config" file="${basedir}/App.config" if="${file::exists(basedir+'/App.config')}"/>
+    <copyref file="${dir.build}/${app.name}.exe" todir="${dir.build}" verbose="true">
+      <assemblies refid="project.references"/>
+    </copyref>
+  </target>
+
+  <target name="common.compile-winexe">
+    <csc target="winexe"
+      output="${dir.build}/${app.name}.exe"
+      debug="${debug}"
+      optimize="${optimize}"
+      doc="${dir.build}/${app.name}.xml"
+      warninglevel="${warninglevel}"
+      define="${define}"
+      verbose="false"
+      win32icon="${basedir}\App.ico">
+      <sources>
+        <include name="${dir.src}/**/*.cs"/>
+        <include name="${assemblyinfo.cs}"/>
+        <exclude name="${dir.src}/AssemblyInfo.cs"/>
+        <include name="${basedir}/Properties/*.cs"/>
+        <exclude name="${basedir}/Properties/AssemblyInfo.cs"/>
+        <include name="${basedir}/Web References/**/*.cs"/>
+        <exclude name="${dir.src}/**/*.xaml.cs"/>
+      </sources>
+      <!-- Only used references will be set inside this assembly -->
+      <references refid="project.references"/>
+      <resources dynamicprefix="true" prefix="${app.name}" basedir="${basedir}">
+        <include name="${basedir}/Properties/Resources.resx"/>
+        <include name="${basedir}/Properties/**/*.xsl"/>
+        <include name="${basedir}/Properties/**/*.xml"/>
+        <include name="${dir.src}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.resx"/>
+        <include name="${dir.etc}/**/*.gif"/>
+        <include name="${dir.etc}/**/*.bmp"/>
+        <include name="${dir.etc}/**/*.png"/>
+        <include name="${dir.etc}/**/*.xsd"/>
+        <include name="${dir.etc}/**/*.xslt"/>
+        <include name="${dir.etc}/**/*.xml"/>
+      </resources>
+    </csc>
+  </target>
+  
+  <!-- =========================================================== -->
+  <!-- Common web project build -->
+  <!-- =========================================================== -->
+
+  <target name="common.build-web">
+    <property name="temp.webbuild.dir" value="../web_build_temp"/>
+    <!-- clean any leftovers from unsucesfull build -->
+    <delete dir="${temp.webbuild.dir}" includeemptydirs="true"/>
+    <call target="common.generate-assemblyinfo"/>
+    <mkdir dir="${basedir}/Bin"/>
+    <exec program="${aspnet_compiler}" commandline="-d -errorstack  -p ${basedir} -v / ${temp.webbuild.dir}"/>
+    <move todir="${dir.dist}/${app.name}">
+      <fileset basedir="${temp.webbuild.dir}">
+        <include name="**/*"/>
+        <exclude name="**/*.build"/>
+        <exclude name="**/Asp_Data/*.*"/>
+      </fileset>
+    </move>
+    <delete dir="${dir.dist}/App_Data" verbose="true"/>
+    <delete dir="${temp.webbuild.dir}"/>
+    <delete file="${basedir}/App_Code/AssemblyInfo.cs"/>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Common project clenup -->
+  <!-- =========================================================== -->
+
+  <target name="common.clean" depends="init">
+    <delete failonerror="false">
+      <fileset>
+        <include name="${dir.dist}/**/*"/>
+        <include name="${dir.build}/**/*"/>
+        <include name="${basedir}/obj/**/*"/>
+        <include name="${basedir}/bin/**/*"/>
+      </fileset>
+    </delete>
+    <delete dir="${dir.dist}" failonerror="false" if="${directory::exists(dir.dist)}"/>
+    <delete dir="${dir.build}" failonerror="false" if="${directory::exists(dir.build)}" />
+    <!-- VS does not like this dir to be removed, it crashes -->
+    <!--delete dir="${basedir}/obj" failonerror="false" if="${directory::exists(basedir+'/obj')}"/>
+    <delete dir="${basedir}/bin" failonerror="false" if="${directory::exists(basedir+'/bin')}"/-->
+  </target>
+
+  <target name="common.dist-quick">
+    <mkdir dir="${dir.dist}/${app.name}"/>
+    <move todir="${dir.dist}/${app.name}">
+      <fileset basedir="${dir.build}">
+        <include name="*.*"/>
+        <exclude name="${app.name}-expected.xml"/>
+        <exclude name="${dir.dist}"/>
+      </fileset>
+    </move>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Common project WiX installer build, customization is made in WXS files -->
+  <!-- =========================================================== -->
+  <target name="common.installer.wix">
+
+    <!-- Dodatkowe taski używane poniżej -->
+    <loadtasks assembly="${wix.dir}\Microsoft.Tools.WindowsInstallerXml.NAntTasks.dll" />
+
+    <!-- Skasuj pliki logów, powstałe podczas pracy programistycznej -->
+    <delete dir="${dir.dist}\logs" />
+
+    <echo message="Kompiluję głowną cześć isntalatora"/>
+    <property name="new.product.guid" value="${qualent::new-guid()}"/>
+    <property name="installer.dir.build" value="${dir.build}/installer.build"/>
+    <property name="installer.dir.src" value="../misc/installer/${project::get-name()}/"/>
+    <property name="installer.dir.uisrc" value="${installer.dir.src}/customWixUI/ui" />
+    <mkdir dir="${installer.dir.build}"/>
+
+    <candle out="${installer.dir.build}/main.wixobj" exedir="${wix.dir}">
+      <defines>
+        <define name="product.guid" value="${new.product.guid}" />
+        <define name="installer.dir.src" value="${installer.dir.src}" />
+        <define name="dir.src" value="${dir.src}" />
+        <define name="app.name" value="${project::get-name()}" />
+        <define name="app.name.short" value="${string::substring(project::get-name(), 0, 8)}" />
+        <define name="version" value="${version}" />
+        <define name="version.short" value="${version.short}" />
+        <define name="version.long" value="${buildnumber.version}" />
+      </defines>
+      <sources>
+        <include name="${installer.dir.src}/main.wxs" />
+      </sources>
+    </candle>
+
+    <echo message="Tworzę dynamiczną listę plików które mają znaleźć sie w paczce instalacyjnej"/>
+    <property name="fragmentwix.xml" value="${installer.dir.build}/fragment.wsx"/>
+    <exec program="${mallow.dir}/mallow.exe" failonerror="false" resultproperty="mallowReturnCode" commandline="-d ${dir.dist}/${app.name} -t ${fragmentwix.xml} -w INSTALLDIR -~ -n"/>
+    <fail if="${mallowReturnCode != '1'}">Build failed (Mallow return code ${mallowReturnCode})</fail>
+
+    <echo message="Kompiluję wygenerowaną cześć isntalatora"/>
+    <candle out="${installer.dir.build}/fragmentwix.wixobj" exedir="${wix.dir}">
+      <sources>
+        <include name="${fragmentwix.xml}" />
+      </sources>
+    </candle>
+
+    <if test="${installer.build-ui}">
+      <echo message="Kompiluję UI instalatora"/>
+      <mkdir dir="${installer.dir.build}/ui"/>
+      <candle out="${installer.dir.build}/ui/" exedir="${wix.dir}">
+        <sources>
+          <include name="${installer.dir.uisrc}\wixui\*.wxs" />
+          <include name="${installer.dir.uisrc}\wixui\installdir\*.wxs" />
+        </sources>
+      </candle>
+      <lit out="${installer.dir.build}\CustomWixUI_Mondo.wixlib" exedir="${wix.dir}" rebuild="true">
+        <sources>
+          <include name="${installer.dir.build}\ui\*.wixobj" />
+        </sources>
+      </lit>
+    </if>
+
+    <copy todir="${installer.dir.build}">
+      <fileset basedir="${installer.dir.src}">
+        <include name="*.vbs"/>
+      </fileset>
+    </copy>
+    
+    <property name="installer.file" value="${installer.name}.msi"/>
+    <light out="${dir.dist}\${installer.file}" exedir="${wix.dir}"
+			locfile="${wix.dir}\WixUI_en-us.wxl" rebuild="true" warningsaserrors="true">
+      <sources>
+        <include name="${installer.dir.build}/*.wixobj" />
+        <include name="${installer.dir.build}\CustomWixUI_Mondo.wixlib"/>
+        <include name="${wix.dir}\sca.wixlib" />
+        <include name="${wix.dir}\wixca.wixlib" />
+      </sources>
+    </light>
+
+    <!--light out="${dir.build}\${installer.file}" exedir="${wix.dir}"
+      locfile="${wix.dir}\WixUI_en-us.wxl" rebuild="true" warningsaserrors="true">
+      <sources>
+        <include name="${wix.obj}" />
+        <include name="${fragmentwix.obj}" />
+        <include name="${installer.folder}\customWixUI\CustomWixUI_Mondo.wixlib"/>
+        <include name="${wix.dir}\sca.wixlib" />
+        <include name="${wix.dir}\wixca.wixlib" />
+      </sources>
+    </light-->
+
+
+    <copy tofile="${dir.dist}/${installer.name}-Install.bat" file="${installer.dir.src}/install.bat">
+      <filterchain>
+        <replacestring from="[Client.msi]" to="${installer.file}" />
+        <replacestring from="[ProductGuid]" to="${new.product.guid}" />
+      </filterchain>
+    </copy>
+    <copy tofile="${dir.dist}/${installer.name}-Uninstall.bat" file="${installer.dir.src}/uninstall.bat">
+      <filterchain>
+        <replacestring from="[Client.msi]" to="${installer.file}" />
+        <replacestring from="[ProductGuid]" to="${new.product.guid}" />
+      </filterchain>
+    </copy>
+
+    <copy todir="${dir.dist}" flatten="true" verbose="true" overwrite="true">
+      <fileset>
+    	<include name="${dir.solution}/misc/installer/${app.name}/${project.prefix}.*.txt"/>
+    	<include name="${dir.solution}/misc/installer/${app.name}/*.PI.txt"/>
+      </fileset>
+      <filterchain>
+         <replacestring from="[dir-name]" to="${release.name}" />
+         <replacestring from="[dir-ver]" to="${release.ver}" />
+         <replacestring from="[version]" to="${release.ver}" />
+         <replacestring from="[installer-name]" to="${installer.name}" />
+      </filterchain>
+    </copy>
+    
+  </target>
+</project>

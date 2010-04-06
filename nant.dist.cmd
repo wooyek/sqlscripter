@@ -1,0 +1,2 @@
+nant dist
+PAUSE

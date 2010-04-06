@@ -1,0 +1,11 @@
+glob:.svn
+glob:build
+glob:bin
+glob:obj
+glob:*.user
+glob:*.suo
+glob:_ReSharper.*
+glob:*.sln.cache
+glob:Chronos.Database/*.New/*
+glob:UpgradeLog.XML
+glob:_UpgradeReport_Files/*

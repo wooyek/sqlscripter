@@ -1,0 +1,8 @@
+SQLScripter
+http://code.google.com/p/sqlscripter/
+
+Log4Net
+http://logging.apache.org/log4net/
+
+NUnit
+http://www.nunit.org/

@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Include>
+  <!-- 
+    Ten identfikator jest unikalnym indetyfiaktorem produktu 
+    musi być zmieniamy pomiędzy projektami, inaczej instalacja jednego 
+    produktu będzie wykrywała instalację innego produktu jako wcześniejszą wersję
+  -->
+  <?define UpgradeCode = "{5BB9D8B9-F0BC-4b64-AA69-DAAE1EFE7804}" ?>
+  <?define ProductName = "SQLScripter" ?>
+  <?define CompanyName = "Janusz Skonieczny" ?>
+ 
+</Include>

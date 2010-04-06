@@ -1,0 +1,580 @@
+﻿<?xml version="1.0" encoding="utf-8"?><!-- 
+* ==================================================================
+* Copyright 2010 Janusz Skonieczny
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*  http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+* =================================================================== -->
+<project name="common.tasks" default="usage" basedir="." xmlns='http://nant.sourceforge.net/schema/nant-0.84.xsd'>
+  <loadtasks assembly="${dir.solution}/misc/nant/WooYek.NAnt.dll"/>
+  <loadtasks assembly="${NCoverExplorer.NAntTasks.dll}" if="${property::exists('NCoverExplorer.NAntTasks.dll')}"/>
+
+  <!-- =========================================================== -->
+  <!-- Usage help -->
+  <!-- =========================================================== -->
+
+  <target name="common.solution-usage">
+    <echo message=""/>
+    <echo message="${app.Name} Build instructions"/>
+    <echo message=" available targets are:"/>
+    <echo message=""/>
+    <echo message="  dist       --> creates distribution for ${app.Name}"/>
+    <echo message="                 in ${dir.dist} with installer"/>
+    <echo message=""/>
+    <echo message="  ndoc       --> prepares javadoc documentation for ${app.Name}"/>
+    <echo message="                 in ${dir.doc}"/>
+    <echo message=""/>
+    <echo message="  release.zip -> creates a release distribution of project, placed in "/>
+    <echo message="                 ${dir.dist}, increments build.number"/>
+    <echo message=""/>
+    <echo message="  release.all -> creates a release distribution of project, placed in "/>
+    <echo message="                 ${dir.dist}, increments build.number "/>
+    <echo message="                 source files are included in the release"/>
+    <echo message=""/>
+    <echo message="  release    --> dist, increments build.number afterwards"/>
+    <echo message=""/>
+    <echo message="  release.tag -> like release.zip with VCS Tagging"/>
+    <echo message="                 IMPORTANT !"/>
+    <echo message="                 Make sure all modifications are commited before proceeding"/>
+    <echo message=""/>
+    <echo message="  installer  --> creates an instalator for each project in"/>
+    <echo message="                 build/dist/ by default, requires prior dist"/>
+    <echo message=""/>
+    <echo message="  svn-tag    --> creates a tag in SVN"/>
+    <echo message=""/>
+    <echo message="  clean      --> cleans up all generated files and directories"/>
+    <echo message=""/>
+    <echo message="  build      --> compiles the source code"/>
+    <echo message="                 to ${dir.build}"/>
+    <echo message=""/>
+    <echo message="  initdb     --> drops database and restores it from scripts"/>
+    <echo message=""/>
+    <echo message="  coverage   --> prepares test coverage report"/>
+    <echo message="                 in ${dir.build}"/>
+    <echo message=""/>
+    <echo message="  usage      --> provides this help on using the build tool (default)"/>
+    <echo message=""/>
+    <echo message="----------------------------------------------------------------------------"/>
+    <echo message=""/>
+    <echo message=" There are additional properties used to alter normal course of building:"/>
+    <echo message="  debug=false   "/>
+    <echo message="  optimize=true   "/>
+    <echo message="  warninglevel=3   "/>
+    <echo message=""/>
+    <echo message=" See comments inside the build.xml file for more details."/>
+    <echo message=""/>
+    <echo message="----------------------------------------------------------------------------"/>
+    <echo message=""/>
+
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Common utility scripts -->
+  <!-- =========================================================== -->
+
+  <script language="C#" prefix="qualent" >
+    <code>
+      <![CDATA[
+              [Function("new-guid")]
+              public static string Testfunc(  ) {
+                  return Guid.NewGuid().ToString("D").ToUpper();
+              }
+            ]]>
+    </code>
+  </script>
+
+  <!-- =========================================================== -->
+  <!-- Common solution initialization -->
+  <!-- =========================================================== -->
+  <target name="common.solution-init">
+    <version buildtype="NoIncrement" />
+    <exec program="${svn.exe}" commandline="revert build.number"/>
+
+    <!-- =========================================================== -->
+    <!-- These are vendor specific options  -->
+    <!-- =========================================================== -->
+
+    <property name="solution.name" value="${project::get-name()}"/>
+    <property name="client.name" value="Qualent"/>
+    <property name="app.Name" value="${string::replace(solution.name, '-', '/')}"/>
+    <!-- app.name is frequently used also as string, not property !- search and replace -->
+    <property name="app.name" value="${solution.name}"/>
+    <property name="app.vendor" value="Qualent Software Sp. z o.o."/>
+    <property name="year" value="${datetime::get-year(datetime::now())}"/>
+    <property name="copyright" value="Copyright &#169; ${year} ${app.vendor}"/>
+    <echo message="====================================================================="/>
+    <echo message="|  ${app.Name} version ${buildnumber.version} [${year}]"/>
+    <echo message="|  Target framework: ${framework::get-target-framework()} (${framework::get-description(framework::get-target-framework())})"/>
+    <echo message="|  ${framework::get-framework-directory(framework::get-target-framework())}"/>
+    <echo message="====================================================================="/>
+
+    <property name="release.ver" value="${buildnumber.major}.${buildnumber.minor}.${buildnumber.build}"/>
+    <property name="release.name" value="${app.name}-${release.ver}"/>
+
+    <!-- Compiler settings -->
+    <property name="debug" value="true" unless="${property::exists('debug')}"/>
+    <property name="optimize" value="false" unless="${property::exists('optimize')}"/>
+    <property name="warninglevel" value="3" unless="${property::exists('warninglevel')}"/>
+    <property name="coverage" value="true" unless="${property::exists('coverage')}"/>
+    <property name="nunit" value="true" unless="${property::exists('nunit')}"/>
+
+
+    <property name="username" value="${environment::get-user-name()}" />
+    <property name="hostname" value="${environment::get-variable('COMPUTERNAME')}"/>
+
+    <!-- CVS Tagging uses this tstamp.date, please leave it in acceptale format -->
+    <tstamp/>
+    <tstamp>
+      <formatter property="time.now.long" pattern="d MMMM yyyy HH:mm:ss"/>
+    </tstamp>
+
+    <!-- =========================================================== -->
+    <!-- Seting solution directories -->
+    <!-- =========================================================== -->
+
+    <property name="dir.build" value="${basedir}/build"/>
+    <property name="dir.dist" value="${dir.build}/dist"/>
+    <property name="dir.misc" value="${basedir}/misc"/>
+    <property name="dir.etc" value="${basedir}/etc"/>
+    <property name="dir.doc" value="${basedir}/doc"/>
+    <property name="dir.lib" value="${basedir}/lib"/>
+
+  </target>
+
+
+  <!-- =========================================================== -->
+  <!-- Copy and substiture production instruction files -->
+  <!-- =========================================================== -->
+  <target name="make-pi" depends="init">
+    <copy todir="${dir.build}" flatten="true" verbose="true" overwrite="true">
+      <fileset refid="pi.files"/>
+      <filterchain>
+        <replacestring from="[dir-name]" to="${release.name}" />
+         <replacestring from="[dir-ver]" to="${release.ver}" />
+         <replacestring from="[version]" to="${release.ver}" />
+      </filterchain>
+    </copy>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Cretes release version of the solution  -->
+  <!-- =========================================================== -->
+  <target name="release.all" depends="dist,release.src,release.clean-knowhow,ndoc,release.zip,release.tag"/>
+  <target name="release.internal" depends="dist,release.src,ndoc,release.zip,release.tag"/>
+
+  <target name="release.doc" depends="dist,ndoc,release.tag"/>
+  <target name="release" depends="dist,coverage">
+    <property name="dir.release" value="${dir.build}/${release.name}"/>
+    <mkdir dir="${dir.release}"/>
+    <move todir="${dir.release}">
+      <fileset basedir="${dir.dist}">
+        <include name="**"/>
+      </fileset>
+    </move>
+    <delete includeemptydirs="true">
+      <fileset basedir="${dir.dist}" >
+        <include name="**"/>
+        <exclude name="${dir.release}"/>
+      </fileset>
+    </delete>
+    <version buildtype="Increment" prefix="new"/>
+  </target>
+
+  <target name="release.zip.w32">
+    <property name="w32" value=""/>
+    <call target="release.zip"/>
+  </target>
+
+  <target name="release.zip" depends="release">
+
+    <property name="disttribution.file" value="${dir.build}\${release.name}-${tstamp.date}${tstamp.time}.zip"/>
+    <zip zipfile="${disttribution.file}" comment="Release package for the ${app.Name} solution. Prepared by ${username} on ${time.now.long}">
+      <fileset basedir="${dir.release}" prefix="${release.name}">
+        <include name="**/*"/>
+      </fileset>
+      <fileset basedir="${dir.build}">
+        <include name="*.cab"/>
+      </fileset>
+    </zip>
+  </target>
+
+  <target name="release.tag" depends="release.zip, archive, svn-tag">
+  </target>
+
+  <target name="archive" >
+    <copy file="${disttribution.file}" todir="${dir.archive}"/>
+  </target>
+  
+  <target name="svn-tag" depends="init">
+    <echo message="Making SVN tag: ${svn.basepath}/tags/T${tstamp.date}-Build-${buildnumber.version}"/>
+    <property name="svn-tag.cmd" value="copy -m &quot;Build ${buildnumber.build}  Version:${buildnumber.version}&quot; ${dir.solution} ${svn.basepath}/tags/T${tstamp.date}-Build-${buildnumber.version}"/>
+    <echo message="${svn.exe} ${svn-tag.cmd}"/>
+    <exec program="${svn.exe}" commandline="${svn-tag.cmd}"/>
+    <version buildtype="Increment" prefix="new"/>
+    <exec program="${svn.exe}" commandline="commit -m &quot;Build ${buildnumber.build} Version:${buildnumber.version}&quot; build.number"/>
+  </target>
+
+  <target name="hg-tag" depends="init">
+    <exec program="${hg.exe}" commandline="revert --no-backup build.number"/>
+    <echo message="Making HG tag: T${tstamp.date}-Build-${buildnumber.version}"/>
+    <property name="hg-tag.cmd" value="tag -m &quot;Build ${buildnumber.build}  Version:${buildnumber.version} by ${username} on ${hostname}&quot; T${tstamp.date}-Build-${buildnumber.version}"/>
+    <echo message="${hg.exe} ${hg-tag.cmd}"/>
+    <exec program="${hg.exe}" commandline="${hg-tag.cmd}"/>
+    <version buildtype="Increment" prefix="new"/>
+    <exec program="${hg.exe}" commandline="commit -m &quot;Incrementd build.number ${new.build} Version:${new.version}&quot; build.number"/>
+  </target>
+
+
+  <!-- =========================================================== -->
+  <!-- Copies all sources of this solution for release  -->
+  <!-- =========================================================== -->
+  <target name="release.clean-knowhow" depends="build" if="false">
+    <delete>
+      <fileset basedir="${dir.dist.src}">
+        <include name="**/*.nant.build"/>
+        <include name="**/*.nant.include"/>
+        <include name="**/SqlScripter.exe"/>
+        <include name="**/SqlScripter.exe.config"/>
+        <include name="**/Interop.SQLDMO.dll"/>
+        <include name="**/NAntTasks.dll"/>
+      </fileset>
+    </delete>
+  </target>
+
+  <target name="release.src" depends="build">
+    <property name="dir.dist.src" value="${dir.dist}/${app.name}-${buildnumber.version}-SRC-${tstamp.date}${tstamp.time}"/>
+    <mkdir dir="${dir.dist.src}"/>
+    <copy todir="${dir.dist.src}">
+      <fileset basedir="${basedir}">
+        <include name="**/*"/>
+        <exclude name="**/*.suo"/>
+        <exclude name="**/CVS"/>
+        <exclude name="**/.#*"/>
+        <exclude name="**/cvsignore"/>
+        <exclude name="**/doc"/>
+        <exclude name="**/doc/**/*"/>
+        <exclude name="**/build"/>
+        <exclude name="**/build/**/*"/>
+        <exclude name="**/bin/**/*"/>
+        <exclude name="**/bin"/>
+        <exclude name="**/obj/**/*"/>
+        <exclude name="**/obj"/>
+        <exclude name="**/_ReSharper.${solution.name}/**/*"/>
+        <exclude name="**/_ReSharper.*"/>
+        <exclude name="**/*.resharperoptions"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Making NSI installer -->
+  <!-- =========================================================== -->
+  <target name="common.make-nsi" depends="init">
+    <exec program="${makensis.exe}" commandline="&quot;${dir.misc}\instalator\${solution.name}.nsi&quot;">
+      <environment>
+        <variable name="PROJECT_DIRECTORY" value="${basedir}"/>
+        <variable name="PROJECT_VERSION" value="${buildnumber.version}"/>
+        <variable name="PROJECT_NAME" value="${solution.name}"/>
+        <variable name="PROJECT_KLIENT" value="${client.name}"/>
+        <variable name="PROJECT_COPYRIGHT" value="${copyright}"/>
+        <variable name="PROJECT_VENDOR" value="${app.vendor}"/>
+        <variable name="BUILD_HOSTNAME" value="${hostname}"/>
+        <variable name="BUILD_TIME" value="${time.now.long}"/>
+      </environment>
+    </exec>
+    <copy file="${dir.build}/${solution.name}-Install.exe" tofile="${dir.dist}/${app.name}-${buildnumber.version}-Install-${tstamp.date}${tstamp.time}.exe"/>
+    <zip zipfile="${dir.build}/${app.name}-${buildnumber.version}-Install-${tstamp.date}${tstamp.time}.zip">
+      <fileset basedir="${dir.dist}">
+        <includes name="${app.name}-${app.version}.${build.number}-Install-${tstamp.date}${tstamp.time}.exe"/>
+      </fileset>
+    </zip>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Making PocketPC CAB installer -->
+  <!-- =========================================================== -->
+  <target name="common.make-cab" depends="init">
+    <property name="cabwiz.exe" value="C:\Program Files\Microsoft Visual Studio 8\SmartDevices\SDK\SDKTools\cabwiz.exe"/>
+    <property name="cabwiz.inf" value="${dir.misc}\MobileSD.inf"/>
+    <copy file="${dir.misc}\MobileSD.inf" tofile="${dir.build}\MobileSD.inf">
+      <filterchain>
+        <!-- replacing @basedir@ with value of basedir in all files.-->
+        <replacetokens>
+          <token key="basedir" value="${dir.dist}" />
+        </replacetokens>
+      </filterchain>
+    </copy>
+    <property name="cabwiz.inf" value="${dir.build}\MobileSD.inf"/>
+    <exec program="${cabwiz.exe}" commandline="${cabwiz.inf} /dest ${dir.build} /err ${dir.build}\cabwiz-log.txt /cpu ARM MIPS"/>
+    <delete file="${cabwiz.inf}"/>
+    <delete file="${dir.build}\cabwiz-log.txt"/>
+
+    <move file="${dir.build}/MobileSD.ARM.cab" tofile="${dir.build}/${release.name}-Install-ARM-${tstamp.date}${tstamp.time}.cab"/>
+    <move file="${dir.build}/MobileSD.MIPS.cab" tofile="${dir.build}/${release.name}-Install-MIPS-${tstamp.date}${tstamp.time}.cab"/>
+    <copy file="${dir.misc}/NETCFv2.wm.armv4i.cab" todir="${dir.build}"/>
+    <copy file="${dir.misc}/System_SR_ENU_wm.cab" todir="${dir.build}"/>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Copy installer files do dist and create archiwe -->
+  <!-- =========================================================== -->
+  <target name="common.include-installers-in-dist">
+    <copy todir="${dir.dist}">
+      <fileset basedir="${dir.build}">
+        <include name="*.cab"/>
+        <include name="*.msi"/>
+        <include name="*.exe"/>
+        <include name="*.bat"/>
+        <include name="*.PI*.txt"/>
+      </fileset>
+    </copy>
+    <zip zipfile="${dir.build}/${release.name}-Install-${tstamp.date}${tstamp.time}.zip">
+      <fileset basedir="${dir.dist}">
+        <include name="${installer.name}-Install-*"/>
+      </fileset>
+    </zip>
+  </target>
+
+
+  <!-- =========================================================== -->
+  <!-- Perform database initialization -->
+  <!-- =========================================================== -->
+  <target name="common.init-db">
+    <property name="db.server" value="${hostname}" unless="${property::exists('db.server')}"/>
+    <property name="db.constr" value="Provider=SQLOLEDB;Data Source=${db.server};Initial Catalog=${db.name};Integrated Security=SSPI;"/>
+    <property name="db.constr2" value="Provider=SQLOLEDB;Data Source=${db.server};Initial Catalog=tempdb;Integrated Security=SSPI;"/>
+    <echo message="====================================================================="/>
+    <echo message="|  DB Host:  ${hostname} "/>
+    <echo message="|  DB Name:  ${db.name}"/>
+    <echo message="|  DB Create:${db.dbcreate}"/>
+    <echo message="|  ${db.constr}"/>
+    <echo message="====================================================================="/>
+
+    <echo message="Dropping database ${db.name} ..."/>
+    <sql connstring="${db.constr2}" transaction="true" print="true" delimiter="GO" delimstyle="Line">
+      IF  EXISTS (SELECT name FROM master.dbo.sysdatabases WHERE name = N'${db.name}')
+      ALTER DATABASE [${db.name}]
+      SET SINGLE_USER
+      WITH ROLLBACK IMMEDIATE
+      GO
+      IF  EXISTS (SELECT name FROM master.dbo.sysdatabases WHERE name = N'${db.name}') DROP DATABASE [${db.name}]
+    </sql>
+    <echo message="Database ${db.name} dropped."/>
+
+    <if test="${property::exists('db.dbcreate') and file::exists(db.dbcreate)}">
+      <echo message="Executing DB create script"/>
+      <sql connstring="${db.constr2}" batch="false" transaction="false" print="true" delimiter="GO" delimstyle="Line" source="${db.dbcreate}" expandprops="false"/>
+    </if>
+    <if test="${not (property::exists('db.dbcreate') and file::exists(db.dbcreate))}">
+      <echo message="Create database in place"/>
+      <sql connstring="${db.constr2}" batch="false" transaction="false" print="true" delimiter="GO" delimstyle="Line">
+        CREATE DATABASE [${db.name}]
+        COLLATE Polish_CI_AS
+        GO
+      </sql>
+    </if> 
+    <echo message="Executing remaining scripts"/>
+    <sqlfiles connstring="${db.constr}" batch="false" transaction="false" print="true" delimiter="GO" delimstyle="Line" expandprops="false" encoding="utf-8">
+	<scripts refid="sql.files"/>
+    </sqlfiles>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Creates a documentation -->
+  <!-- =========================================================== -->
+  <target name="ndoc" depends="build" if="true">
+    <!-- Workaround for assemblies blocking -->
+    <!--exec program="nantcf" commandline="ndoc.quick"/-->
+    <!--
+    <nant target="ndoc.quick"/>
+-->
+  </target>
+  <target name="ndoc.quick" depends="">
+    <mkdir dir="${dir.dist}"/>
+    <echo message="If it does not work, try to build then nant.quick"/>
+    <property name="dir.dist.doc.temp" value="${dir.dist}\${app.name}.SDK\"/>
+    <property name="doc.filename" value="${app.name}-${buildnumber.version}"/>
+    <ndoc verbose="true">
+      <assemblies basedir="${basedir}">
+        <include name="${basedir}/Hermes.Core/build/dist/Hermes.Core.dll"/>
+        <include name="${basedir}/Hermes.Client/build/dist/Hermes.Client.dll"/>
+      </assemblies>
+      <documenters>
+        <documenter name="MSDN">
+          <property name="OutputDirectory" value="${dir.dist.doc.temp}"/>
+          <property name="HtmlHelpName" value="${doc.filename}"/>
+          <property name="Title" value="${app.Name} ${buildnumber.version} - Class Library"/>
+          <property name="IncludeFavorites" value="False"/>
+          <property name="SplitTOCs" value="False"/>
+          <property name="DefaulTOC" value=""/>
+          <property name="IncludeHierarchy" value="False"/>
+          <property name="ShowVisualBasic" value="False"/>
+          <property name="RootPageContainsNamespaces" value="True"/>
+          <property name="SortTOCByNamespace" value="True"/>
+          <property name="OutputTarget" value="HtmlHelp"/>
+          <property name="HeaderHtml" value=""/>
+          <property name="FooterHtml" value=""/>
+          <property name="FilesToInclude" value=""/>
+          <property name="LinkToSdkDocVersion" value="SDK_v1_1"/>
+          <property name="ShowMissingSummaries" value="False"/>
+          <property name="ShowMissingRemarks" value="False"/>
+          <property name="ShowMissingParams" value="False"/>
+          <property name="ShowMissingReturns" value="True"/>
+          <property name="ShowMissingValues" value="True"/>
+          <property name="DocumentInternals" value="True"/>
+          <property name="DocumentProtected" value="True"/>
+          <property name="DocumentPrivates" value="True"/>
+          <property name="DocumentProtectedInternalAsProtected" value="False"/>
+          <property name="DocumentEmptyNamespaces" value="False"/>
+          <property name="IncludeAssemblyVersion" value="True"/>
+          <property name="CopyrightText" value=""/>
+          <property name="CopyrightHref" value=""/>
+          <property name="ReferencesPath" value=""/>
+          <property name="SkipNamespacesWithoutSummaries" value="False"/>
+          <property name="UseNamespaceDocSummaries" value="False"/>
+          <property name="AutoPropertyBackerSummaries" value="True"/>
+          <property name="AutoDocumentConstructors" value="True"/>
+          <property name="DocumentAttributes" value="False"/>
+          <property name="ShowTypeIdInAttributes" value="False"/>
+          <property name="DocumentedAttributes" value=""/>
+          <property name="GetExternalSummaries" value="True"/>
+          <property name="EditorBrowsableFilter" value="Off"/>
+          <property name="UseNDocXmlFile" value=""/>
+        </documenter>
+      </documenters>
+    </ndoc>
+    <delete file="${dir.dist}\${doc.filename}.chm" failonerror="false"/>
+    <move file="${dir.dist.doc.temp}\${doc.filename}.chm" todir="${dir.dist}"/>
+    <delete dir="${dir.dist.doc.temp}"/>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Caclucation of test coverage -->
+  <!-- User must make sure that all test data and all other depndencies are met -->
+  <!-- =========================================================== -->
+  <target name="coverage" depends="dist" if="${coverage}">
+    <property name="ncover.cmd" value="&quot;${nant.exe}&quot; nunit.quick //x ${dir.build}\${solution.name}.Coverage.xml //w ${basedir} //iis"/>
+    <echo message="${ncover.org.exe}"/>
+    <echo message="${ncover.cmd}"/>
+    <exec program="${ncover.org.exe}" workingdir="${basedir}" commandline="${ncover.cmd}"/>
+    <exec program="iisreset"/>
+    <property name="dir.dist.tests" value="${dir.dist}/Test-Reports"/>
+    <mkdir dir="${dir.dist.tests}"/>
+    <copy file="${dir.build}\${solution.name}.Coverage.xml" todir="${dir.dist.tests}"/>
+    <style style="${dir.misc}\tests\Coverage.xsl" destdir="${dir.dist.tests}">
+      <infiles basedir="${dir.build}">
+        <include name="${solution.name}.Coverage.xml"/>
+      </infiles>
+    </style>
+    <style style="${dir.misc}\tests\AlternativeNUnitDetails.xsl" destdir="${dir.dist.tests}">
+      <infiles basedir="${dir.build}\tests">
+        <include name="*-results.xml"/>
+      </infiles>
+    </style>
+    <mkdir dir="${dir.dist.tests}/images"/>
+    <copy todir="${dir.dist.tests}/images">
+      <fileset basedir="${dir.misc}/tests/images">
+        <include name="*.*"/>
+      </fileset>
+    </copy>
+    <call target="coverage.report"/>
+    <delete file="${basedir}/Coverage.Log" failonerror="false"/>
+  </target>
+
+<target name="coverage.report" depends="init">
+  <ncoverexplorer
+    program="${NCoverExplorer.Console.exe}"
+    projectName="${solution.name}"
+    reportType="ModuleClassSummary" 
+    outputDir="${dir.dist}/Test-Reports"
+    xmlReportName="${dir.build}\${solution.name}.CoverageRep.xml"
+    htmlReportName="${solution.name}.Coverage.html"
+    showExcluded="True"
+    satisfactoryCoverage="65" >
+    <fileset>
+      <include name="${dir.build}\${solution.name}.Coverage.xml" />
+    </fileset>
+    <exclusions>
+      <exclusion type="Assembly" pattern="*.Tests" />
+      <exclusion type="Assembly" pattern="NHibernate*" />
+      <exclusion type="Assembly" pattern="Qualent*" />
+      <exclusion type="Assembly" pattern="WooYek*" />
+      <exclusion type="Namespace" pattern="*.Tests*" />
+    </exclusions>
+  </ncoverexplorer>
+</target>
+ 
+  <!-- =========================================================== -->
+  <!-- Cruise control entry point -->
+  <!-- =========================================================== -->
+  <target name="cruise.build" depends="clear.buildnumber,initdb,clean,build,dist,coverage,release.src,release.zip">
+    <delete file="build.number"/>
+  </target>
+  <target name="clear.buildnumber">
+    <echo message="0.0.0.0" file="build.number"/>
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Testing targets -->
+  <!-- =========================================================== -->
+  <target name="nunit" depends="dist,nunit.quick" if="${nunit}"/>
+  <target name="common-nunit.quick" depends="init" if="${nunit}">
+    <echo message="Running NUnit tests"/>
+    <nunit2 haltonfailure="true" failonerror="true">
+      <formatter type="Xml" usefile="true" extension=".xml" outputdir="${dir.build}/tests" />
+      <formatter type="Plain"/>
+      <!--test appconfig="${solution.name}.NUnit.config"-->
+      <test>
+        <assemblies refid="test.target"/>
+        <categories>
+          <exclude name="Wymaga WS" if="false"/>
+          <exclude name="Interactive" if="true"/>
+          <exclude name="Wymaga środowiska testowego" if="true"/>
+          <exclude name="Not allowed on Server" if="true"/>
+          <exclude name="TODO" if="true"/>
+        </categories>
+      </test>
+    </nunit2>
+    <!--
+      <nunitreport out="${dir.build}/tests/${solution.name}.TestSummary.html">
+        <fileset>
+          <include name="${dir.build}/tests/*.xml" />
+        </fileset>
+      </nunitreport>
+    -->
+
+  </target>
+
+  <!-- =========================================================== -->
+  <!-- Clean all build time created directories, subprojects too -->
+  <!-- =========================================================== -->
+  <target name="common.solution-clean" depends="common.solution-init">
+    <delete includeemptydirs="false" failonerror="false">
+      <fileset>
+        <include name="${dir.dist}/**/*"/>
+        <include name="${dir.build}/**/*"/>
+      </fileset>
+    </delete>
+    <delete dir="${dir.dist}" failonerror="false" if="${directory::exists(dir.dist)}"/>
+    <delete dir="${dir.build}" failonerror="false" if="${directory::exists(dir.build)}"/>
+    <delete dir="${basedir}/_ReSharper.${solution.name}" failonerror="false" if="${directory::exists(basedir+'/_ReSharper.'+solution.name)}"/>
+    <property name="dir.ProjectAssemblies" value="${environment::get-folder-path('LocalApplicationData')}\Microsoft\VisualStudio\8.0\ProjectAssemblies"/>
+    <echo message="Warning VS do not like this."/>
+    <echo message="Clearing ${dir.ProjectAssemblies}"/>
+    <delete dir="${dir.ProjectAssemblies}" failonerror="false"/> 
+    <nant target="clean">
+      <buildfiles refid="projects"/>
+    </nant>
+  </target>
+  
+</project>
